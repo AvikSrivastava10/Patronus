@@ -19,10 +19,11 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "start": "node bin/clipeus.js"
+    "start": "node bin/clipeus.js",
+    "prepublishOnly": "vitest run"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19.0"
   },
   "keywords": [
     "security",
