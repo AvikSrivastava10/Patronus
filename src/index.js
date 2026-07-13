@@ -10,6 +10,13 @@ export { renderReport, FORMATS } from './report/index.js';
 export { detectProject } from './detectors/detect.js';
 export { loadConfig, getDefaultConfig } from './config/config.js';
 export { loadSuppressions } from './config/clipeusignore.js';
+export { applyInlineSuppressions } from './config/inline-suppress.js';
+export {
+  baselineFingerprint,
+  loadBaseline,
+  writeBaseline,
+  partitionByBaseline,
+} from './config/baseline.js';
 export {
   createFinding,
   fingerprintFinding,

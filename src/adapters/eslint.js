@@ -13,6 +13,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { TOOL, SEVERITY, CONFIDENCE, CATEGORY } from '../constants.js';
 import { createFinding } from '../core/finding.js';
 import { STATUS } from './base.js';
@@ -31,6 +32,38 @@ function nodeMeetsEslintRequirement() {
   const [major, minor] = process.versions.node.split('.').map((n) => Number(n));
   if (major > ESLINT_MIN_NODE.major) return true;
   return major === ESLINT_MIN_NODE.major && minor >= ESLINT_MIN_NODE.minor;
+}
+
+/**
+ * Prefer the target project's own ESLint installation (>=9), so the engine
+ * matches the project's Node/toolchain. Resolves it from the target's
+ * node_modules. Returns null if the project has no usable ESLint.
+ */
+function loadTargetEslint(root) {
+  try {
+    const req = createRequire(path.join(root, 'package.json'));
+    const mod = req('eslint');
+    const ESLint = mod?.ESLint;
+    const version = ESLint?.version;
+    if (ESLint && version && parseInt(String(version), 10) >= 9) {
+      return { ESLint, version, source: 'project' };
+    }
+  } catch {
+    /* target project has no resolvable/compatible ESLint */
+  }
+  return null;
+}
+
+/** Load the ESLint bundled with Clipeus. */
+function loadBundledEslint() {
+  try {
+    const req = createRequire(import.meta.url);
+    const mod = req('eslint');
+    if (mod?.ESLint) return { ESLint: mod.ESLint, version: mod.ESLint.version ?? null, source: 'bundled' };
+  } catch {
+    /* bundled ESLint unresolvable (should not happen) */
+  }
+  return null;
 }
 
 /** Per-rule mapping onto the unified schema. */
@@ -77,28 +110,24 @@ const adapter = {
    * Fully custom runner using the ESLint Node API. Never throws.
    */
   async runCustom(ctx) {
-    // Adapt to the runtime Node version: skip (don't crash) if it can't run ESLint.
-    if (!nodeMeetsEslintRequirement()) {
-      return {
-        status: STATUS.skipped,
-        findings: [],
-        reason: `bundled ESLint requires Node >= ${ESLINT_MIN_NODE.major}.${ESLINT_MIN_NODE.minor} (running on ${process.versions.node}); upgrade Node to enable ESLint security linting.`,
-      };
+    // 1. Prefer the project's own ESLint (guaranteed compatible with its Node).
+    // 2. Otherwise use the bundled ESLint, which needs a modern Node runtime.
+    let resolved = loadTargetEslint(ctx.root);
+    if (!resolved) {
+      if (!nodeMeetsEslintRequirement()) {
+        return {
+          status: STATUS.skipped,
+          findings: [],
+          reason: `no compatible ESLint in the project, and the bundled ESLint needs Node >= ${ESLINT_MIN_NODE.major}.${ESLINT_MIN_NODE.minor} (running on ${process.versions.node}). Upgrade Node or add eslint>=9 to the project to enable ESLint security linting.`,
+        };
+      }
+      resolved = loadBundledEslint();
+    }
+    if (!resolved?.ESLint) {
+      return { status: STATUS.skipped, findings: [], reason: 'ESLint is not resolvable (project or bundled).' };
     }
 
-    let ESLint;
-    let version = null;
-    try {
-      const mod = await import('eslint');
-      ESLint = mod.ESLint;
-      version = ESLint?.version ?? null;
-    } catch (err) {
-      return { status: STATUS.skipped, findings: [], reason: `eslint not resolvable: ${err.message}` };
-    }
-    if (!ESLint) {
-      return { status: STATUS.skipped, findings: [], reason: 'ESLint API unavailable' };
-    }
-
+    const { ESLint, version, source } = resolved;
     try {
       const eslint = new ESLint({
         cwd: ctx.root,
@@ -112,7 +141,12 @@ const adapter = {
       ];
       const results = await eslint.lintFiles(patterns);
       const findings = adapter.normalize(results, { ...ctx, root: ctx.root, version });
-      return { status: STATUS.ok, findings, version };
+      log.debug(`eslint: used ${source} install (v${version})`);
+      return {
+        status: STATUS.ok,
+        findings,
+        version: source === 'project' ? `${version} (project)` : version,
+      };
     } catch (err) {
       log.debug(`eslint runCustom error: ${err.stack || err.message}`);
       return { status: STATUS.error, findings: [], reason: err.message, version };

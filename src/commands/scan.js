@@ -14,16 +14,18 @@ import path from 'node:path';
 import { runScan } from '../scan/engine.js';
 import { renderReport } from '../report/index.js';
 import { log, spinner, setVerbose, chalk } from '../core/logger.js';
-import { SEVERITY } from '../constants.js';
+import { SEVERITY, CONFIDENCE } from '../constants.js';
 
 function resolveFormat(opts) {
-  if (opts.json && opts.markdown) {
-    log.warn('Both --json and --markdown given; using --json.');
-    return 'json';
+  const chosen = [
+    opts.json && 'json',
+    opts.markdown && 'markdown',
+    opts.sarif && 'sarif',
+  ].filter(Boolean);
+  if (chosen.length > 1) {
+    log.warn(`Multiple output formats given (${chosen.join(', ')}); using "${chosen[0]}".`);
   }
-  if (opts.json) return 'json';
-  if (opts.markdown) return 'markdown';
-  return 'terminal';
+  return chosen[0] || 'terminal';
 }
 
 function parseList(value) {
@@ -45,6 +47,21 @@ export async function scanCommand(pathArg, opts = {}) {
   let failOn = opts.failOn ? String(opts.failOn).toLowerCase() : undefined;
   if (failOn && !SEVERITY[failOn]) {
     log.error(`Invalid --fail-on value "${opts.failOn}". Expected: critical | high | medium | low.`);
+    process.exitCode = 2;
+    return;
+  }
+
+  // Validate --min-confidence.
+  const minConfidence = opts.minConfidence ? String(opts.minConfidence).toLowerCase() : undefined;
+  if (minConfidence && !CONFIDENCE[minConfidence]) {
+    log.error(`Invalid --min-confidence value "${opts.minConfidence}". Expected: high | medium | low.`);
+    process.exitCode = 2;
+    return;
+  }
+
+  // --update-baseline requires --baseline.
+  if (opts.updateBaseline && !opts.baseline) {
+    log.error('--update-baseline requires --baseline <file>.');
     process.exitCode = 2;
     return;
   }
@@ -72,6 +89,10 @@ export async function scanCommand(pathArg, opts = {}) {
       only: parseList(opts.only),
       skip: parseList(opts.skip),
       verbose: opts.verbose,
+      offline: Boolean(opts.offline),
+      minConfidence,
+      baselineFile: opts.baseline,
+      updateBaseline: Boolean(opts.updateBaseline),
       hooks: {
         onPlan: (tasks) => {
           total = tasks.length;
@@ -106,6 +127,13 @@ export async function scanCommand(pathArg, opts = {}) {
     }
   } else {
     process.stdout.write(`${report}\n`);
+  }
+
+  if (scan.baseline?.updated && !scan.baseline.error) {
+    log.success(`Baseline updated: recorded ${scan.baseline.recorded} finding(s) to ${scan.baseline.file}`);
+  } else if (scan.baseline && !scan.baseline.updated) {
+    const known = scan.baseline.known ?? 0;
+    log.info(chalk.gray(`baseline: ${scan.baseline.new} new finding(s), ${known} already baselined${scan.baseline.missing ? ' (baseline file not found — all treated as new)' : ''}.`));
   }
 
   // Brief stderr summary for machine-format runs so humans still get feedback.

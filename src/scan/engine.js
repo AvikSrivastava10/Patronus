@@ -25,8 +25,11 @@ import { TAINT_ANALYZERS } from '../taint/index.js';
 import { detectProject } from '../detectors/detect.js';
 import { loadConfig } from '../config/config.js';
 import { loadSuppressions } from '../config/clipeusignore.js';
+import { applyInlineSuppressions } from '../config/inline-suppress.js';
+import { loadBaseline, writeBaseline, partitionByBaseline } from '../config/baseline.js';
 import { deduplicate, sortFindings, summarize } from '../core/dedup.js';
 import { meetsSeverityThreshold } from '../core/finding.js';
+import { CONFIDENCE_ORDER } from '../constants.js';
 import { log } from '../core/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -173,6 +176,7 @@ export async function runScan(options = {}) {
     tmpDir,
     rulesDir: RULES_DIR,
     verbose: Boolean(options.verbose),
+    offline: Boolean(options.offline),
   };
 
   // Build the task list.
@@ -236,18 +240,64 @@ export async function runScan(options = {}) {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   } catch { /* best effort */ }
 
-  // Collect + suppress + dedup + sort.
+  // ---- Post-processing pipeline ----
+  // 1) collect raw findings from every analyzer
   const rawFindings = [];
   for (const r of toolResults) {
     if (Array.isArray(r.findings)) rawFindings.push(...r.findings);
   }
-  const { kept, suppressed } = suppressions.apply(rawFindings);
-  const { findings: deduped, duplicatesRemoved } = deduplicate(kept);
-  const findings = sortFindings(deduped);
-  const summary = summarize(findings);
+  // 2) project-wide suppressions (.clipeusignore + config.ignore)
+  const { kept: afterIgnore, suppressed: ignoreSuppressed } = suppressions.apply(rawFindings);
+  // 3) inline comment suppressions (clipeus-disable directives in source)
+  const { kept: afterInline, suppressed: inlineSuppressed } = applyInlineSuppressions(afterIgnore, root);
+  // 4) deduplicate across tools
+  const { findings: deduped, duplicatesRemoved } = deduplicate(afterInline);
 
+  // 5) optional minimum-confidence filter (reduce heuristic noise)
+  let current = deduped;
+  let minConfidenceFiltered = 0;
+  const minConfidence = options.minConfidence ? String(options.minConfidence).toLowerCase() : null;
+  if (minConfidence && CONFIDENCE_ORDER[minConfidence]) {
+    const before = current.length;
+    current = current.filter((f) => (CONFIDENCE_ORDER[f.confidence] ?? 0) >= CONFIDENCE_ORDER[minConfidence]);
+    minConfidenceFiltered = before - current.length;
+  }
+  current = sortFindings(current);
+
+  // 6) optional baseline: report only findings not already recorded
+  let baseline = null;
+  let reported = current;
+  if (options.baselineFile) {
+    if (options.updateBaseline) {
+      let recorded = 0;
+      let error = null;
+      try {
+        recorded = writeBaseline(options.baselineFile, current);
+      } catch (err) {
+        error = err.message;
+        log.error(`Could not write baseline ${options.baselineFile}: ${err.message}`);
+      }
+      baseline = { file: options.baselineFile, updated: true, recorded, error };
+      reported = current;
+    } else {
+      const loaded = loadBaseline(options.baselineFile);
+      if (loaded) {
+        const { newFindings, knownFindings } = partitionByBaseline(current, loaded.fingerprints);
+        reported = sortFindings(newFindings);
+        baseline = { file: options.baselineFile, new: newFindings.length, known: knownFindings.length };
+      } else {
+        baseline = { file: options.baselineFile, new: current.length, known: 0, missing: true };
+      }
+    }
+  }
+
+  const findings = reported;
+  const summary = summarize(findings);
   const threshold = (options.failOn || config.failOn || 'critical').toLowerCase();
-  const failed = findings.some((f) => meetsSeverityThreshold(f.severity, threshold));
+  // A baseline-update run records state and never fails the build.
+  const failed = baseline?.updated
+    ? false
+    : findings.some((f) => meetsSeverityThreshold(f.severity, threshold));
 
   return {
     root,
@@ -256,8 +306,12 @@ export async function runScan(options = {}) {
     config,
     toolResults,
     findings,
-    suppressedCount: suppressed.length,
+    suppressedCount: ignoreSuppressed.length + inlineSuppressed.length,
+    inlineSuppressedCount: inlineSuppressed.length,
     duplicatesRemoved,
+    minConfidence,
+    minConfidenceFiltered,
+    baseline,
     summary,
     threshold,
     failed,

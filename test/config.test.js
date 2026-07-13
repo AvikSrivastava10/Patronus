@@ -49,6 +49,17 @@ describe('loadConfig', () => {
     const { config } = loadConfig(dir);
     expect(config.failOn).toBe('critical');
   });
+
+  it('tolerates unknown keys (typo detection is a warning, not a failure)', () => {
+    fs.writeFileSync(
+      path.join(dir, 'clipeus.config.json'),
+      JSON.stringify({ failOnn: 'high', failOn: 'high', tools: { enabledd: ['x'] } }),
+    );
+    const { config } = loadConfig(dir);
+    // Unknown keys are kept (harmless) but valid ones still apply.
+    expect(config.failOn).toBe('high');
+    expect(config.tools.enabled).toEqual([]);
+  });
 });
 
 describe('getDefaultConfig', () => {

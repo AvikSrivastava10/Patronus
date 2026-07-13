@@ -75,7 +75,12 @@ export function detectProject(root, opts = {}) {
     node: [], python: [], docker: [], terraform: [],
     kubernetes: [], java: [], dotnet: [], git: [],
   };
-  const meta = { npmLockfile: null, k8sManifests: [], fileCount: 0 };
+  const meta = {
+    npmLockfile: null,
+    k8sManifests: [],
+    fileCount: 0,
+    nodeConstraint: detectNodeConstraint(abs),
+  };
 
   // .git may be a directory (normal) or a file (worktrees/submodules).
   if (fs.existsSync(path.join(abs, '.git'))) {
@@ -218,6 +223,40 @@ function pushUnique(arr, value) {
 function hasExt(set, group) {
   for (const e of group) if (set.has(e)) return true;
   return false;
+}
+
+/**
+ * Read the target project's declared Node version constraint, if any, from
+ * .nvmrc, .node-version, or package.json "engines.node". Lets Clipeus report
+ * the toolchain it detected and adapt messaging. Read-only, never throws.
+ * @returns {{source:string, value:string}|null}
+ */
+function detectNodeConstraint(root) {
+  const readFirstLine = (name) => {
+    try {
+      const p = path.join(root, name);
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+        const v = fs.readFileSync(p, 'utf8').trim().split(/\r?\n/)[0].trim();
+        return v || null;
+      }
+    } catch { /* ignore */ }
+    return null;
+  };
+
+  const nvmrc = readFirstLine('.nvmrc');
+  if (nvmrc) return { source: '.nvmrc', value: nvmrc };
+  const nodeVersion = readFirstLine('.node-version');
+  if (nodeVersion) return { source: '.node-version', value: nodeVersion };
+
+  try {
+    const pkgPath = path.join(root, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      const eng = pkg?.engines?.node;
+      if (eng) return { source: 'package.json engines.node', value: String(eng) };
+    }
+  } catch { /* ignore */ }
+  return null;
 }
 
 /** Top-level marker summary without a full walk (used by `init` for speed). */

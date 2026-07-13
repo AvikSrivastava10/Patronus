@@ -5,8 +5,9 @@
 import * as terminal from './terminal.js';
 import * as json from './json.js';
 import * as markdown from './markdown.js';
+import * as sarif from './sarif.js';
 
-export const FORMATS = Object.freeze(['terminal', 'json', 'markdown']);
+export const FORMATS = Object.freeze(['terminal', 'json', 'markdown', 'sarif']);
 
 /**
  * @param {object} scan  runScan() result.
@@ -23,10 +24,12 @@ export function renderReport(scan, opts = {}) {
       return json.render(scan, inner);
     case 'markdown':
       return markdown.render(scan, inner);
+    case 'sarif':
+      return sarif.render(scan, inner);
     case 'terminal':
     default:
       return terminal.render(scan, inner);
   }
 }
 
-export { terminal, json, markdown };
+export { terminal, json, markdown, sarif };

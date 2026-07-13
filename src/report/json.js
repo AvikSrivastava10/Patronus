@@ -40,10 +40,14 @@ export function render(scan, opts = {}) {
         .filter(([, v]) => v)
         .map(([k]) => k),
       languages: scan.detection.languages,
+      nodeConstraint: scan.detection.meta?.nodeConstraint || undefined,
     },
     summary: scan.summary,
     suppressedCount: scan.suppressedCount,
     duplicatesRemoved: scan.duplicatesRemoved,
+    minConfidence: scan.minConfidence || undefined,
+    minConfidenceFiltered: scan.minConfidenceFiltered || undefined,
+    baseline: scan.baseline || undefined,
     tools: scan.toolResults.map((t) => ({
       id: t.id,
       status: t.status,

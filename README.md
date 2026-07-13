@@ -100,9 +100,14 @@ clipeus scan
 | --- | --- |
 | `--json` | Output findings as JSON in the unified schema (to stdout, or `--output <file>`). |
 | `--markdown` | Output a markdown summary, ready to paste into a PR comment (pure templating, no AI/LLM involved). |
+| `--sarif` | Output SARIF 2.1.0 for GitHub code scanning (Security tab) and IDE SARIF viewers. |
 | `--fail-on=<critical\|high\|medium\|low>` | Minimum severity that causes a non-zero exit code. Default: `critical`. |
+| `--min-confidence=<high\|medium\|low>` | Hide findings below this confidence (reduce heuristic noise). |
 | `--only=<tool1,tool2>` | Run only the named tool(s)/check(s). |
 | `--skip=<tool1,tool2>` | Run everything except the named tool(s)/check(s). |
+| `--baseline <file>` | Compare against a baseline and report only **new** findings. |
+| `--update-baseline` | Record the current findings as the baseline (requires `--baseline`). |
+| `--offline` | Avoid network features (e.g. the Semgrep registry); use bundled rules only. |
 | `--verbose` | Include rule id, tool version, and references per finding. |
 | `--output <file>` | Write the report to a file instead of stdout. |
 
@@ -111,9 +116,39 @@ clipeus scan
 clipeus scan
 clipeus scan ./services/api --fail-on=high
 clipeus scan --json --output clipeus-report.json
+clipeus scan --sarif --output clipeus.sarif        # upload to GitHub code scanning
 clipeus scan --only=semgrep,gitleaks --markdown
-clipeus scan --skip=owasp-dependency-check
+clipeus scan --min-confidence=medium --offline     # high-signal, no network
 ```
+
+### Baseline: adopt on a legacy codebase without the noise
+
+Record the current findings as an accepted baseline, then have CI fail only on **new** issues:
+
+```bash
+# One-time: accept the current state.
+clipeus scan --baseline .clipeus-baseline.json --update-baseline
+
+# From then on (e.g. in CI / the pre-push hook): only regressions fail.
+clipeus scan --baseline .clipeus-baseline.json --fail-on=high
+```
+
+Baseline fingerprints are line-independent, so unrelated edits that shift code around don't resurface already-accepted findings.
+
+### Inline suppressions
+
+Acknowledge a finding right where it lives, in any language's comment syntax:
+
+```js
+// clipeus-disable-next-line              // suppress every finding on the next line
+foo(userInput);                           // clipeus-disable-line injection   (only the "injection" category)
+```
+
+```python
+os.system(cmd)  # clipeus-disable-line    (this line only)
+```
+
+Use `clipeus-disable-file` (or a bare `clipeus-disable`) at the top of a file to suppress the whole file. Each directive optionally takes a comma/space-separated list of rule ids, categories, or tool ids; with none, it suppresses everything in scope.
 
 ---
 
@@ -127,7 +162,7 @@ Clipeus is **project-aware**: it only runs the tools relevant to your detected s
 | [gitleaks](https://github.com/gitleaks/gitleaks) | Secret detection (working tree + git history) | MIT | `.git` present |
 | [truffleHog](https://github.com/trufflesecurity/trufflehog) | Secret detection (verification off by default) | AGPL-3.0 | `.git` present |
 | npm audit | Node dependency CVEs | ships with npm | `package.json` |
-| [ESLint](https://eslint.org) + `eslint-plugin-security` + `eslint-plugin-no-unsanitized` | JS/TS security linting (**bundled** with Clipeus) | MIT | JS/TS project |
+| [ESLint](https://eslint.org) + `eslint-plugin-security` + `eslint-plugin-no-unsanitized` | JS/TS security linting (uses the **project's own ESLint** when present, else the bundled one) | MIT | JS/TS project |
 | [pip-audit](https://github.com/pypa/pip-audit) | Python dependency CVEs | Apache-2.0 | Python project |
 | [Bandit](https://github.com/PyCQA/bandit) | Python security linting | Apache-2.0 | Python project |
 | [Trivy](https://github.com/aquasecurity/trivy) | Dockerfiles, Kubernetes, Terraform, filesystem deps | Apache-2.0 | Docker/K8s/Terraform |
@@ -152,7 +187,8 @@ Selectable ids for `--only` / `--skip`: `semgrep, gitleaks, trufflehog, npm-audi
 - **Terminal (default):** color-coded, grouped by severity, human-readable.
 - **`--json`:** the full normalized findings array plus scan metadata.
 - **`--markdown`:** PR-comment-ready summary.
-- **Exit code:** non-zero when any finding is at or above `--fail-on` (default `critical`), zero otherwise. Ideal for CI and the pre-push hook.
+- **`--sarif`:** SARIF 2.1.0 for GitHub code scanning and IDE SARIF viewers.
+- **Exit code:** non-zero when any finding is at or above `--fail-on` (default `critical`), zero otherwise (with `--baseline`, only *new* findings count). Ideal for CI and the pre-push hook.
 
 Every finding — from every source — is normalized into one schema:
 
@@ -175,8 +211,13 @@ Findings that overlap across tools (same file + line + category) are **deduplica
 ### CI usage
 
 ```bash
-# Non-interactive; fail the build on high+ findings; emit JSON artifact.
+# Non-interactive; fail the build on high+ findings; emit a JSON artifact.
 CI=1 clipeus scan --fail-on=high --json --output clipeus-report.json
+
+# GitHub code scanning: emit SARIF and upload it to the Security tab.
+CI=1 clipeus scan --sarif --output clipeus.sarif
+#   - uses: github/codeql-action/upload-sarif@v3
+#     with: { sarif_file: clipeus.sarif }
 ```
 
 Set `CI=1` or `CLIPEUS_NONINTERACTIVE=1` to guarantee Clipeus never prompts.

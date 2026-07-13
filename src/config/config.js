@@ -90,6 +90,30 @@ export function getDefaultConfig() {
   };
 }
 
+/** Known configuration keys, for typo detection (warnings only). */
+const KNOWN_KEYS = {
+  root: ['failOn', 'toolTimeoutMs', 'tools', 'checkers', 'taint', 'ignore', 'semgrep', 'gitleaks', 'trufflehog', 'trivy'],
+  tools: ['enabled', 'disabled'],
+  checkers: ['sensitivePathKeywords', 'authMiddlewareNames', 'rateLimitMiddlewareNames', 'sensitiveRoutePatterns'],
+  taint: ['sources', 'sinks', 'sanitizers'],
+};
+
+/** Warn (never throw) about unrecognized config keys to catch typos. */
+function validateConfig(parsed, fileLabel) {
+  const warnUnknown = (obj, known, scope) => {
+    if (!isPlainObject(obj)) return;
+    for (const key of Object.keys(obj)) {
+      if (!known.includes(key)) {
+        log.warn(`${fileLabel}: unknown config key "${scope}${key}" (ignored — check for typos).`);
+      }
+    }
+  };
+  warnUnknown(parsed, KNOWN_KEYS.root, '');
+  warnUnknown(parsed.tools, KNOWN_KEYS.tools, 'tools.');
+  warnUnknown(parsed.checkers, KNOWN_KEYS.checkers, 'checkers.');
+  warnUnknown(parsed.taint, KNOWN_KEYS.taint, 'taint.');
+}
+
 function isPlainObject(v) {
   return v && typeof v === 'object' && !Array.isArray(v);
 }
@@ -136,6 +160,7 @@ export function loadConfig(cwd = process.cwd()) {
       log.warn(`Config at ${path.basename(file)} is not an object; using defaults.`);
       return { config: defaults, path: file };
     }
+    validateConfig(parsed, path.basename(file));
     if (parsed.failOn && !SEVERITY[String(parsed.failOn).toLowerCase()]) {
       log.warn(`Config failOn "${parsed.failOn}" is invalid; expected critical|high|medium|low.`);
       delete parsed.failOn;

@@ -92,6 +92,10 @@ export function render(scan, opts = {}) {
   out.push(chalk.bold(`${PRODUCT} v${VERSION}`) + chalk.gray(`  ·  security scan`));
   out.push(chalk.gray(`  target: ${scan.root}`));
   out.push(chalk.gray(`  detected: ${stacks.length ? stacks.join(', ') : 'unknown stack'}`));
+  const nodeConstraint = scan.detection?.meta?.nodeConstraint;
+  if (nodeConstraint) {
+    out.push(chalk.gray(`  project node: ${nodeConstraint.value} (${nodeConstraint.source})`));
+  }
   out.push('');
 
   // Analyzer status
@@ -134,15 +138,23 @@ export function render(scan, opts = {}) {
     out.push(chalk.magenta(`  ${s.aiCodegen} finding${s.aiCodegen === 1 ? '' : 's'} match AI-codegen antipatterns`));
   }
   if (scan.suppressedCount > 0) {
-    out.push(chalk.gray(`  ${scan.suppressedCount} suppressed via .clipeusignore`));
+    out.push(chalk.gray(`  ${scan.suppressedCount} suppressed (.clipeusignore + inline directives)`));
+  }
+  if (scan.minConfidenceFiltered > 0) {
+    out.push(chalk.gray(`  ${scan.minConfidenceFiltered} below --min-confidence=${scan.minConfidence} hidden`));
   }
   if (scan.duplicatesRemoved > 0) {
     out.push(chalk.gray(`  ${scan.duplicatesRemoved} duplicate finding(s) merged`));
   }
+  if (scan.baseline && !scan.baseline.updated) {
+    out.push(chalk.gray(`  baseline: ${scan.baseline.known ?? 0} known finding(s) hidden; showing NEW only`));
+  }
   out.push(chalk.gray(`  completed in ${(scan.durationMs / 1000).toFixed(1)}s`));
   out.push('');
 
-  if (scan.failed) {
+  if (scan.baseline?.updated) {
+    out.push(chalk.green.bold(`✔ Baseline recorded — ${scan.baseline.recorded} finding(s) written to ${scan.baseline.file}.`));
+  } else if (scan.failed) {
     out.push(chalk.red.bold(`✖ Failed — findings at or above "${scan.threshold}" severity threshold.`));
   } else {
     out.push(chalk.green.bold(`✔ Passed — no findings at or above "${scan.threshold}" severity threshold.`));

@@ -47,11 +47,17 @@ const adapter = {
     const userConfigs = ctx.config?.semgrep?.configs;
     if (Array.isArray(userConfigs) && userConfigs.length) {
       configs.push(...userConfigs);
-    } else {
+    } else if (!ctx.offline) {
+      // `auto` fetches a tailored ruleset from the Semgrep registry (network).
+      // In offline mode we skip it and rely solely on the bundled rules.
       configs.push('auto');
     }
-    // Bundled custom rules (Phase 2).
+    // Bundled custom rules (Phase 2) — always available, no network.
     if (ctx.rulesDir && fs.existsSync(ctx.rulesDir)) {
+      configs.push(ctx.rulesDir);
+    }
+    // If offline and there were no configs at all, still point at bundled rules.
+    if (configs.length === 0 && ctx.rulesDir) {
       configs.push(ctx.rulesDir);
     }
 

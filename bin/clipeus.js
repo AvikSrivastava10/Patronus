@@ -45,14 +45,19 @@ program
   .description('run all applicable analyzers and report findings')
   .option('--json', 'output findings as JSON (unified schema)')
   .option('--markdown', 'output a markdown summary suitable for a PR comment')
+  .option('--sarif', 'output SARIF 2.1.0 (GitHub code scanning / IDE viewers)')
   .option('--fail-on <severity>', 'minimum severity that causes a non-zero exit code: critical|high|medium|low')
+  .option('--min-confidence <level>', 'only report findings at/above this confidence: high|medium|low')
   .option('--only <list>', 'run only the named tool(s)/check(s), comma-separated')
   .option('--skip <list>', 'run everything except the named tool(s)/check(s), comma-separated')
+  .option('--baseline <file>', 'compare against a baseline file and report only NEW findings')
+  .option('--update-baseline', 'record the current findings as the baseline (requires --baseline)')
+  .option('--offline', 'avoid network features (e.g. Semgrep registry); use bundled rules only')
   .option('--verbose', 'include rule id, tool version, and references per finding')
   .option('--output <file>', 'write the report to a file instead of stdout')
   .addHelpText(
     'after',
-    `\nAvailable tools/checks for --only/--skip:\n  ${allSelectableIds().join(', ')}\n\nExamples:\n  $ clipeus scan\n  $ clipeus scan ./services/api --fail-on=high\n  $ clipeus scan --json --output report.json\n  $ clipeus scan --only=semgrep,gitleaks --markdown`,
+    `\nAvailable tools/checks for --only/--skip:\n  ${allSelectableIds().join(', ')}\n\nExamples:\n  $ clipeus scan\n  $ clipeus scan ./services/api --fail-on=high\n  $ clipeus scan --sarif --output clipeus.sarif\n  $ clipeus scan --baseline .clipeus-baseline.json --fail-on=high   # gate only new issues\n  $ clipeus scan --baseline .clipeus-baseline.json --update-baseline # accept current state\n  $ clipeus scan --min-confidence=medium --offline`,
   )
   .action(async (pathArg, opts) => {
     await scanCommand(pathArg, opts);
