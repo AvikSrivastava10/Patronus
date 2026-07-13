@@ -1,0 +1,7 @@
+{
+  "name": "sample-node-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Intentionally vulnerable sample app used for Patronus end-to-end tests.",
+  "main": "app.js"
+}

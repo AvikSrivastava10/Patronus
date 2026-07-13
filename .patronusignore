@@ -1,0 +1,10 @@
+# Patronus's own suppression file (gitignore-style).
+#
+# Syntax:
+#   path glob         e.g.  src/legacy/**   or   *.min.js
+#   rule:<id-or-glob> e.g.  rule:security/detect-object-injection
+#   category:<name>   e.g.  category:info-disclosure
+#   !pattern          re-include (negate) a previously ignored path
+
+# Intentionally vulnerable test fixtures are not real findings.
+test/fixtures/**

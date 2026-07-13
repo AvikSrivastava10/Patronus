@@ -1,0 +1,68 @@
+{
+  "name": "patronus",
+  "version": "0.1.0",
+  "description": "Free, open-source on-demand security and vulnerability auditing CLI. Orchestrates OSS scanners and adds custom detection for gaps common in AI-assisted (\"vibe coded\") development. Read-only, never modifies your code.",
+  "type": "module",
+  "bin": {
+    "patronus": "bin/patronus.js"
+  },
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "node bin/patronus.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "security",
+    "audit",
+    "vulnerability",
+    "scanner",
+    "sast",
+    "cli",
+    "semgrep",
+    "gitleaks",
+    "owasp",
+    "static-analysis",
+    "vibe-coding",
+    "ai-codegen",
+    "devsecops"
+  ],
+  "author": "Avik Srivastava",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AvikSrivastava10/Patronus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AvikSrivastava10/Patronus/issues"
+  },
+  "homepage": "https://github.com/AvikSrivastava10/Patronus#readme",
+  "dependencies": {
+    "@babel/parser": "^7.29.7",
+    "@babel/traverse": "^7.29.7",
+    "@typescript-eslint/parser": "^8.63.0",
+    "chalk": "^5.6.2",
+    "commander": "^15.0.0",
+    "eslint": "^10.7.0",
+    "eslint-plugin-no-unsanitized": "^4.1.5",
+    "eslint-plugin-security": "^4.0.1",
+    "execa": "^9.6.1",
+    "ora": "^9.4.1",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
+  }
+}
