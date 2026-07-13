@@ -18,6 +18,11 @@ If a check fails, is missing, or errors out, Clipeus reports that one check as s
 
 ---
 
+## Requirements
+
+- **Node.js** `^18.19 || ^20.9 || >=21.1` (any current LTS works).
+- Clipeus adapts to your environment: it only runs the analyzers relevant to your stack, and skips any whose requirements aren't met — including its bundled ESLint layer if the Node version is too old — reporting each skip with a reason instead of failing.
+
 ## Installation
 
 Options are listed in increasing order of commitment. Pick the one that fits.

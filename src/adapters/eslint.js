@@ -21,6 +21,18 @@ import { log } from '../core/logger.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, 'eslint.config.js');
 
+// The bundled ESLint needs a modern Node runtime. Clipeus itself supports a
+// broader range, so if it happens to run on a Node too old for ESLint (e.g.
+// force-installed with engine-strict disabled), skip the ESLint layer cleanly
+// with an actionable message rather than surfacing a cryptic runtime error.
+const ESLINT_MIN_NODE = { major: 18, minor: 18 };
+
+function nodeMeetsEslintRequirement() {
+  const [major, minor] = process.versions.node.split('.').map((n) => Number(n));
+  if (major > ESLINT_MIN_NODE.major) return true;
+  return major === ESLINT_MIN_NODE.major && minor >= ESLINT_MIN_NODE.minor;
+}
+
 /** Per-rule mapping onto the unified schema. */
 const RULE_META = {
   'security/detect-eval-with-expression': { category: CATEGORY.injection, severity: SEVERITY.high, confidence: CONFIDENCE.medium },
@@ -65,6 +77,15 @@ const adapter = {
    * Fully custom runner using the ESLint Node API. Never throws.
    */
   async runCustom(ctx) {
+    // Adapt to the runtime Node version: skip (don't crash) if it can't run ESLint.
+    if (!nodeMeetsEslintRequirement()) {
+      return {
+        status: STATUS.skipped,
+        findings: [],
+        reason: `bundled ESLint requires Node >= ${ESLINT_MIN_NODE.major}.${ESLINT_MIN_NODE.minor} (running on ${process.versions.node}); upgrade Node to enable ESLint security linting.`,
+      };
+    }
+
     let ESLint;
     let version = null;
     try {
