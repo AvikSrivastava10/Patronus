@@ -8,8 +8,10 @@
  *     appliesTo(detection): boolean,
  *     run(ctx): Promise<{ status, findings, reason?, version?, durationMs? }>
  *   }
- *
- * Populated in Phase 3 (missing-auth, rate-limiting, security-headers).
  */
 
-export const ALL_CHECKERS = [];
+import missingAuth from './missing-auth.js';
+import rateLimiting from './rate-limiting.js';
+import securityHeaders from './security-headers.js';
+
+export const ALL_CHECKERS = [missingAuth, rateLimiting, securityHeaders];

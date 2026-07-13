@@ -22,7 +22,7 @@ import { ALL_ADAPTERS } from '../adapters/index.js';
 import { runAdapter, STATUS } from '../adapters/base.js';
 import { ALL_CHECKERS } from '../checkers/index.js';
 import { TAINT_ANALYZERS } from '../taint/index.js';
-import { detectProject, computeEnabledCheckers } from '../detectors/detect.js';
+import { detectProject } from '../detectors/detect.js';
 import { loadConfig } from '../config/config.js';
 import { loadSuppressions } from '../config/patronusignore.js';
 import { deduplicate, sortFindings, summarize } from '../core/dedup.js';
@@ -76,8 +76,11 @@ export function selectAnalyzers({ detection, config, only, skip }) {
     toolSet = configEnabled.size
       ? new Set([...configEnabled].filter((id) => knownAdapterIds.has(id)))
       : new Set(detection.enabledTools);
+    // Each internal analyzer decides whether it applies to the detected stack.
     checkerSet = new Set(
-      [...computeEnabledCheckers(detection)].filter((id) => knownCheckerIds.has(id)),
+      INTERNAL_ANALYZERS.filter(
+        (a) => typeof a.appliesTo !== 'function' || a.appliesTo(detection),
+      ).map((a) => a.id),
     );
   }
 
