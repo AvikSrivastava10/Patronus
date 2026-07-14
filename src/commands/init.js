@@ -73,6 +73,45 @@ async function candidateInstallers(install = {}) {
 }
 
 /**
+ * Prerequisite runtimes/package managers for each auto-install method, with a
+ * human label and where to get it. Used to tell the user *why* a tool can't be
+ * installed automatically (e.g. "gitleaks needs Go, which isn't installed").
+ */
+const INSTALL_PREREQS = {
+  pip: { commands: ['pip3', 'pip', 'python'], label: 'Python + pip', url: 'https://www.python.org/downloads/' },
+  go: { commands: ['go'], label: 'Go', url: 'https://go.dev/dl/' },
+  brew: { commands: ['brew'], label: 'Homebrew (macOS/Linux)', url: 'https://brew.sh' },
+  npm: { commands: ['npm'], label: 'npm (Node.js)', url: 'https://nodejs.org' },
+};
+
+/**
+ * For a tool with no runnable auto-installer, work out which prerequisite is
+ * missing for each install method its adapter supports. This lets `init`
+ * explain the specific blocker (a missing runtime/package manager) instead of a
+ * generic "no installer available".
+ *
+ * @param {object} [install]  adapter.install hints (pip/go/brew/npm/...).
+ * @param {(cmd:string)=>Promise<boolean>} [has]  existence check (injectable for tests).
+ * @returns {Promise<Array<{method:string,label:string,url:string,command:string}>>}
+ */
+export async function missingPrereqs(install = {}, has = commandExists) {
+  const reasons = [];
+  for (const [method, info] of Object.entries(INSTALL_PREREQS)) {
+    const command = install?.[method];
+    if (!command) continue;
+    let present = false;
+    for (const cmd of info.commands) {
+      if (await has(cmd)) {
+        present = true;
+        break;
+      }
+    }
+    if (!present) reasons.push({ method, label: info.label, url: info.url, command });
+  }
+  return reasons;
+}
+
+/**
  * @param {object} [opts]
  */
 export async function initCommand(opts = {}) {
@@ -118,7 +157,19 @@ export async function initCommand(opts = {}) {
       continue;
     }
     if (candidates.length === 0) {
-      log.info(chalk.gray(`   no auto-installer available. Install manually: ${installHint(adapter)}`));
+      const blocked = await missingPrereqs(adapter.install);
+      if (blocked.length) {
+        log.info(chalk.gray(`   Can't install ${id} automatically — a required dependency is missing:`));
+        for (const b of blocked) {
+          log.info(chalk.gray(`     • ${b.label} not found (needed for "${b.command}") — get it at ${b.url}`));
+        }
+      } else {
+        log.info(chalk.gray(`   No auto-installer is available for ${id} on this system.`));
+      }
+      if (adapter.install?.url) {
+        log.info(chalk.gray(`     • or install ${id} directly (e.g. a prebuilt binary): ${adapter.install.url}`));
+      }
+      log.info(chalk.gray(`   Install the required dependency above, then re-run \`clipeus init\` to set up ${id}.`));
       continue;
     }
 
@@ -135,9 +186,14 @@ export async function initCommand(opts = {}) {
       sp.succeed(`Installed ${id}.`);
     } else {
       sp.fail(`Could not install ${id} automatically.`);
-      const detail = (res.stderr || res.errorMessage || '').split(/\r?\n/).slice(0, 2).join(' ');
-      if (detail) log.debug(detail);
-      log.info(chalk.gray(`   install manually: ${installHint(adapter)}`));
+      const detail = (res.stderr || res.errorMessage || '')
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .slice(0, 2)
+        .join(' ');
+      if (detail) log.info(chalk.gray(`   reason: ${detail.slice(0, 300)}`));
+      log.info(chalk.gray(`   Install ${id} manually, then re-run \`clipeus init\`: ${installHint(adapter)}`));
     }
   }
   log.blank();
