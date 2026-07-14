@@ -233,6 +233,7 @@ Set `CI=1` or `CLIPEUS_NONINTERACTIVE=1` to guarantee Clipeus never prompts.
   "failOn": "critical",
   "toolTimeoutMs": 120000,
   "tools": { "enabled": [], "disabled": [] },
+  "semgrep": { "registry": "p/default" },
   "checkers": {
     "sensitivePathKeywords": ["admin", "user", "payment", "billing"],
     "authMiddlewareNames": ["requireAuth", "isAuthenticated", "login_required"],
@@ -248,6 +249,7 @@ Set `CI=1` or `CLIPEUS_NONINTERACTIVE=1` to guarantee Clipeus never prompts.
 ```
 
 - `tools.enabled` empty means **auto-detect**. Listing tools overrides detection.
+- `semgrep.registry` is the Semgrep registry ruleset run online (default `p/default`); set it to `false` to scan with only Clipeus's bundled rules, or set `semgrep.configs` to a list to choose the rule sources yourself. Clipeus never uses Semgrep's `auto` config, so scans stay telemetry-free (`--metrics=off`), and `--offline` drops the registry entirely.
 - The checker keyword lists are fully tunable to your project's naming conventions.
 
 ### `.clipeusignore`
