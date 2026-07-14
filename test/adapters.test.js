@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import semgrep from '../src/adapters/semgrep.js';
 import gitleaks from '../src/adapters/gitleaks.js';
 import trufflehog from '../src/adapters/trufflehog.js';
@@ -8,6 +10,10 @@ import bandit from '../src/adapters/bandit.js';
 import trivy from '../src/adapters/trivy.js';
 import owasp from '../src/adapters/owasp-dependency-check.js';
 import eslint from '../src/adapters/eslint.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// A directory that actually exists, so buildInvocation's existsSync(rulesDir) is true.
+const RULES_DIR = path.resolve(__dirname, '..', 'src', 'rules');
 
 describe('semgrep.normalize', () => {
   it('maps severity, honors clipeus metadata tags', () => {
@@ -50,6 +56,55 @@ describe('semgrep.normalize', () => {
 
   it('returns [] for missing results', () => {
     expect(semgrep.normalize({}, {})).toEqual([]);
+  });
+});
+
+describe('semgrep.buildInvocation (regression: auto vs --metrics=off)', () => {
+  const argsFor = (ctx = {}) =>
+    semgrep.buildInvocation({ root: '/proj', target: '.', rulesDir: RULES_DIR, ...ctx }).args;
+
+  it('never combines the `auto` config with --metrics=off, in any mode', () => {
+    // `auto` requires telemetry to be ON; pairing it with --metrics=off makes
+    // semgrep abort ("Cannot create auto config when metrics are off"). This is
+    // the exact bug this guards against — `auto` must never be emitted.
+    for (const ctx of [
+      {},
+      { offline: true },
+      { config: { semgrep: { configs: ['p/ci'] } } },
+      { config: { semgrep: { registry: 'p/security-audit' } } },
+      { config: { semgrep: { registry: false } } },
+    ]) {
+      const args = argsFor(ctx);
+      expect(args).toContain('--metrics=off');
+      expect(args).not.toContain('auto');
+    }
+  });
+
+  it('online (default): uses the p/default registry pack plus the bundled rules', () => {
+    const args = argsFor();
+    expect(args).toContain('p/default');
+    expect(args).toContain(RULES_DIR);
+    expect(args).toContain('--metrics=off');
+  });
+
+  it('offline: bundled rules only, no registry pack', () => {
+    const args = argsFor({ offline: true });
+    expect(args).not.toContain('p/default');
+    expect(args).toContain(RULES_DIR);
+  });
+
+  it('honors explicit config.semgrep.configs and does not add p/default', () => {
+    const args = argsFor({ config: { semgrep: { configs: ['p/ci', 'p/xss'] } } });
+    expect(args).toContain('p/ci');
+    expect(args).toContain('p/xss');
+    expect(args).not.toContain('p/default');
+  });
+
+  it('config.semgrep.registry overrides the pack; false disables it', () => {
+    expect(argsFor({ config: { semgrep: { registry: 'p/security-audit' } } })).toContain('p/security-audit');
+    const disabled = argsFor({ config: { semgrep: { registry: false } } });
+    expect(disabled).not.toContain('p/default');
+    expect(disabled).toContain(RULES_DIR);
   });
 });
 
