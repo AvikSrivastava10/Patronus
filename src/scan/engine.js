@@ -28,6 +28,7 @@ import { loadSuppressions } from '../config/clipeusignore.js';
 import { applyInlineSuppressions } from '../config/inline-suppress.js';
 import { loadBaseline, writeBaseline, partitionByBaseline } from '../config/baseline.js';
 import { deduplicate, sortFindings, summarize } from '../core/dedup.js';
+import { filterVendoredFindings } from '../core/vendored.js';
 import { meetsSeverityThreshold } from '../core/finding.js';
 import { CONFIDENCE_ORDER } from '../constants.js';
 import { log } from '../core/logger.js';
@@ -246,8 +247,11 @@ export async function runScan(options = {}) {
   for (const r of toolResults) {
     if (Array.isArray(r.findings)) rawFindings.push(...r.findings);
   }
+  // 1b) drop findings inside third-party/vendored dirs (node_modules, .venv, …).
+  //     A secret or lint hit in a dependency isn't the user's code to fix.
+  const { kept: afterVendor, filtered: vendoredFindings } = filterVendoredFindings(rawFindings);
   // 2) project-wide suppressions (.clipeusignore + config.ignore)
-  const { kept: afterIgnore, suppressed: ignoreSuppressed } = suppressions.apply(rawFindings);
+  const { kept: afterIgnore, suppressed: ignoreSuppressed } = suppressions.apply(afterVendor);
   // 3) inline comment suppressions (clipeus-disable directives in source)
   const { kept: afterInline, suppressed: inlineSuppressed } = applyInlineSuppressions(afterIgnore, root);
   // 4) deduplicate across tools
@@ -308,6 +312,7 @@ export async function runScan(options = {}) {
     findings,
     suppressedCount: ignoreSuppressed.length + inlineSuppressed.length,
     inlineSuppressedCount: inlineSuppressed.length,
+    vendoredFilteredCount: vendoredFindings.length,
     duplicatesRemoved,
     minConfidence,
     minConfidenceFiltered,

@@ -140,6 +140,9 @@ export function render(scan, opts = {}) {
   if (scan.suppressedCount > 0) {
     out.push(chalk.gray(`  ${scan.suppressedCount} suppressed (.clipeusignore + inline directives)`));
   }
+  if (scan.vendoredFilteredCount > 0) {
+    out.push(chalk.gray(`  ${scan.vendoredFilteredCount} in vendored dirs (node_modules, .venv, …) hidden`));
+  }
   if (scan.minConfidenceFiltered > 0) {
     out.push(chalk.gray(`  ${scan.minConfidenceFiltered} below --min-confidence=${scan.minConfidence} hidden`));
   }
