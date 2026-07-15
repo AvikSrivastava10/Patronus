@@ -82,7 +82,6 @@ export const TOOL = Object.freeze({
   eslint: 'eslint',
   bandit: 'bandit',
   trivy: 'trivy',
-  owaspDependencyCheck: 'owasp-dependency-check',
   // Internal Clipeus detection layers:
   authChecker: 'clipeus-auth',
   rateLimitChecker: 'clipeus-rate-limit',

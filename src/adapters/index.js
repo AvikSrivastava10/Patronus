@@ -10,7 +10,6 @@ import pipAudit from './pip-audit.js';
 import eslint from './eslint.js';
 import bandit from './bandit.js';
 import trivy from './trivy.js';
-import owaspDependencyCheck from './owasp-dependency-check.js';
 
 export const ALL_ADAPTERS = [
   semgrep,
@@ -21,7 +20,6 @@ export const ALL_ADAPTERS = [
   eslint,
   bandit,
   trivy,
-  owaspDependencyCheck,
 ];
 
 export const ADAPTERS = Object.freeze(
@@ -42,5 +40,4 @@ export {
   eslint,
   bandit,
   trivy,
-  owaspDependencyCheck,
 };

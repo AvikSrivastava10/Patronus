@@ -216,9 +216,6 @@ export function computeEnabledTools(stacks, hasSourceFiles) {
     tools.add(TOOL.gitleaks);
     tools.add(TOOL.trufflehog);
   }
-  if (stacks.java || stacks.dotnet) {
-    tools.add(TOOL.owaspDependencyCheck);
-  }
   if (hasSourceFiles) {
     tools.add(TOOL.semgrep);
   }

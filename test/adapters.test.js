@@ -8,7 +8,6 @@ import npmAudit from '../src/adapters/npm-audit.js';
 import pipAudit from '../src/adapters/pip-audit.js';
 import bandit from '../src/adapters/bandit.js';
 import trivy from '../src/adapters/trivy.js';
-import owasp from '../src/adapters/owasp-dependency-check.js';
 import eslint from '../src/adapters/eslint.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -221,16 +220,6 @@ describe('trivy.normalize', () => {
     const misconfig = findings.find((f) => f.category === 'iac-misconfig');
     expect(misconfig.line).toBe(5);
     expect(misconfig.severity).toBe('high');
-  });
-});
-
-describe('owasp-dependency-check.normalize', () => {
-  it('derives severity from CVSS when severity string is absent', () => {
-    const raw = { dependencies: [{ fileName: 'lib.jar', vulnerabilities: [{ name: 'CVE-2020-1', cvssv3: { baseScore: 9.8 }, references: [{ url: 'https://nvd' }] }] }] };
-    const [f] = owasp.normalize(raw);
-    expect(f.severity).toBe('critical');
-    expect(f.category).toBe('dependency-cve');
-    expect(f.ruleId).toBe('CVE-2020-1');
   });
 });
 

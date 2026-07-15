@@ -77,13 +77,6 @@ describe('detectProject', () => {
     expect(d.stacks.kubernetes).toBe(false);
   });
 
-  it('enables OWASP Dependency-Check for Java/.NET manifests', () => {
-    write('pom.xml', '<project></project>');
-    const d = detectProject(dir);
-    expect(d.stacks.java).toBe(true);
-    expect(d.enabledTools.has(TOOL.owaspDependencyCheck)).toBe(true);
-  });
-
   it('reports an empty tool set for a directory with no markers', () => {
     write('notes.txt', 'hello');
     const d = detectProject(dir);

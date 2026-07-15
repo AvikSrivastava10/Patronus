@@ -166,7 +166,6 @@ Clipeus is **project-aware**: it only runs the tools relevant to your detected s
 | [pip-audit](https://github.com/pypa/pip-audit) | Python dependency CVEs | Apache-2.0 | Python project |
 | [Bandit](https://github.com/PyCQA/bandit) | Python security linting | Apache-2.0 | Python project |
 | [Trivy](https://github.com/aquasecurity/trivy) | Dockerfiles, Kubernetes, Terraform, filesystem deps | Apache-2.0 | Docker/K8s/Terraform |
-| [OWASP Dependency-Check](https://owasp.org/www-project-dependency-check/) | Java/.NET dependency CVEs | Apache-2.0 | `pom.xml`, `*.csproj`, etc. |
 
 ### Clipeus's own detection layer (the differentiator)
 
@@ -178,7 +177,7 @@ On top of the tools above, Clipeus adds detection for gaps that generic scanners
 - **`clipeus-security-headers`** — no `helmet` / CSP / HSTS (or `flask-talisman`).
 - **`clipeus-taint`** — cross-file taint tracking from user-controlled sources (`req.body`, `request.args`, …) into dangerous sinks (`eval`, `child_process.exec`, SQL `query`, filesystem calls) without a sanitizer in between.
 
-Selectable ids for `--only` / `--skip`: `semgrep, gitleaks, trufflehog, npm-audit, pip-audit, eslint, bandit, trivy, owasp-dependency-check, clipeus-auth, clipeus-rate-limit, clipeus-security-headers, clipeus-taint`.
+Selectable ids for `--only` / `--skip`: `semgrep, gitleaks, trufflehog, npm-audit, pip-audit, eslint, bandit, trivy, clipeus-auth, clipeus-rate-limit, clipeus-security-headers, clipeus-taint`.
 
 ---
 
