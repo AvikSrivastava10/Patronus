@@ -8,9 +8,10 @@
  *      software without explicit confirmation).
  *   3. Offer to install the pre-push scan hook.
  *   4. Write a default clipeus.config.json.
+ *   5. Add Clipeus's generated artifacts to the project's .gitignore.
  *
  * Read-only w.r.t. source code: the only files this may write are Clipeus's
- * own config and (with consent) the git hook.
+ * own config, its .gitignore entries, and (with consent) the git hook.
  */
 
 import fs from 'node:fs';
@@ -21,6 +22,7 @@ import { installHint } from '../adapters/base.js';
 import { detectProject } from '../detectors/detect.js';
 import { resolveToolInEnvironments } from '../detectors/environments.js';
 import { loadConfig } from '../config/config.js';
+import { ensureGitignore } from '../config/gitignore.js';
 import { enableHook } from '../hooks/git-hook.js';
 import { confirm, isInteractive } from '../core/prompt.js';
 import { log, spinner, chalk } from '../core/logger.js';
@@ -245,6 +247,16 @@ export async function initCommand(opts = {}) {
       log.success(`Wrote ${CONFIG_FILE}.`);
     } catch (err) {
       log.error(`Could not write ${CONFIG_FILE}: ${err.message}`);
+    }
+  }
+
+  // 5. Keep Clipeus's generated artifacts (reports, cache) out of version control.
+  if (detection.stacks.git) {
+    const gi = ensureGitignore(root);
+    if (gi.changed) {
+      log.success(`${gi.created ? 'Created' : 'Updated'} .gitignore (${gi.added.join(', ')}).`);
+    } else if (gi.error) {
+      log.info(chalk.gray(`   could not update .gitignore: ${gi.error}`));
     }
   }
 
