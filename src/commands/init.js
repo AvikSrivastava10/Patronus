@@ -46,6 +46,9 @@ function curatedConfig() {
         'login', 'signup', 'register', 'password', 'reset', 'otp', 'verify', 'token',
       ],
     },
+    // 'demote' (default) | 'ignore' | 'keep' — how to treat likely-false-positive
+    // secret hits inside data files (CSV/Parquet/datasets).
+    secrets: { dataFiles: 'demote' },
     ignore: [],
   };
 }

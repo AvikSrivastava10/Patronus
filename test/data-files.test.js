@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isDataFile, demoteDataFileSecrets, DATA_FILE_EXTENSIONS } from '../src/core/data-files.js';
+import { isDataFile, applyDataFileSecretPolicy, DATA_FILE_EXTENSIONS } from '../src/core/data-files.js';
 
 describe('isDataFile', () => {
   it('recognizes data/dataset extensions (any separator, any case)', () => {
@@ -23,7 +23,7 @@ describe('isDataFile', () => {
   });
 });
 
-describe('demoteDataFileSecrets', () => {
+describe('applyDataFileSecretPolicy', () => {
   const secret = (over = {}) => ({
     category: 'secrets',
     severity: 'high',
@@ -32,40 +32,53 @@ describe('demoteDataFileSecrets', () => {
     ...over,
   });
 
-  it('demotes an unverified (medium-confidence) secret in a data file', () => {
-    const { findings, demoted } = demoteDataFileSecrets([secret()]);
+  it('demotes an unverified (medium-confidence) secret in a data file (default policy)', () => {
+    const { findings, demoted, ignored } = applyDataFileSecretPolicy([secret()]);
     expect(demoted).toBe(1);
+    expect(ignored).toBe(0);
+    expect(findings).toHaveLength(1);
     expect(findings[0].severity).toBe('low');
     expect(findings[0].confidence).toBe('low');
     expect(findings[0].demotedReason).toBe('data-file');
   });
 
-  it('leaves high-confidence secrets alone even in a data file (e.g. gitleaks rules)', () => {
-    const { findings, demoted } = demoteDataFileSecrets([secret({ confidence: 'high' })]);
+  it("policy 'ignore' drops the finding entirely", () => {
+    const { findings, demoted, ignored } = applyDataFileSecretPolicy([secret()], 'ignore');
+    expect(ignored).toBe(1);
     expect(demoted).toBe(0);
+    expect(findings).toHaveLength(0);
+  });
+
+  it("policy 'keep' leaves the finding untouched", () => {
+    const { findings, demoted, ignored } = applyDataFileSecretPolicy([secret()], 'keep');
+    expect(demoted).toBe(0);
+    expect(ignored).toBe(0);
     expect(findings[0].severity).toBe('high');
   });
 
+  it('leaves high-confidence secrets alone even under demote/ignore (e.g. gitleaks rules)', () => {
+    expect(applyDataFileSecretPolicy([secret({ confidence: 'high' })]).demoted).toBe(0);
+    expect(applyDataFileSecretPolicy([secret({ confidence: 'high' })], 'ignore').ignored).toBe(0);
+  });
+
   it('leaves verified/critical secrets alone even in a data file', () => {
-    const { findings, demoted } = demoteDataFileSecrets([secret({ severity: 'critical', confidence: 'high' })]);
+    const { demoted, ignored } = applyDataFileSecretPolicy(
+      [secret({ severity: 'critical', confidence: 'high' })],
+      'ignore',
+    );
     expect(demoted).toBe(0);
-    expect(findings[0].severity).toBe('critical');
+    expect(ignored).toBe(0);
   });
 
-  it('does not touch secrets in source files', () => {
-    const { demoted } = demoteDataFileSecrets([secret({ file: 'src/config.ts' })]);
-    expect(demoted).toBe(0);
-  });
-
-  it('does not touch non-secret findings in data files', () => {
-    const { demoted } = demoteDataFileSecrets([
-      { category: 'dependency-cve', severity: 'high', confidence: 'high', file: 'data.csv' },
-    ]);
-    expect(demoted).toBe(0);
+  it('does not touch secrets in source files or non-secret findings', () => {
+    expect(applyDataFileSecretPolicy([secret({ file: 'src/config.ts' })]).demoted).toBe(0);
+    expect(
+      applyDataFileSecretPolicy([{ category: 'dependency-cve', severity: 'high', confidence: 'high', file: 'data.csv' }]).demoted,
+    ).toBe(0);
   });
 
   it('handles empty input', () => {
-    expect(demoteDataFileSecrets([]).findings).toEqual([]);
+    expect(applyDataFileSecretPolicy([]).findings).toEqual([]);
     expect(DATA_FILE_EXTENSIONS.has('.csv')).toBe(true);
   });
 });

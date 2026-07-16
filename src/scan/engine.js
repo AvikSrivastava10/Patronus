@@ -29,7 +29,7 @@ import { applyInlineSuppressions } from '../config/inline-suppress.js';
 import { loadBaseline, writeBaseline, partitionByBaseline } from '../config/baseline.js';
 import { deduplicate, sortFindings, summarize } from '../core/dedup.js';
 import { filterVendoredFindings } from '../core/vendored.js';
-import { demoteDataFileSecrets } from '../core/data-files.js';
+import { applyDataFileSecretPolicy } from '../core/data-files.js';
 import { meetsSeverityThreshold } from '../core/finding.js';
 import { CONFIDENCE_ORDER } from '../constants.js';
 import { log } from '../core/logger.js';
@@ -257,10 +257,16 @@ export async function runScan(options = {}) {
   const { kept: afterInline, suppressed: inlineSuppressed } = applyInlineSuppressions(afterIgnore, root);
   // 4) deduplicate across tools
   const { findings: deduped, duplicatesRemoved } = deduplicate(afterInline);
-  // 4b) auto-demote low-certainty secret hits inside data files (CSV/Parquet/…).
-  //     Almost always dataset noise, not credentials — demoted (not hidden) so a
-  //     genuine leak in an exported data file is still on record.
-  const { findings: afterDemote, demoted: dataFileDemotedCount } = demoteDataFileSecrets(deduped);
+  // 4b) apply the data-file secret policy (default: demote low-certainty secret
+  //     hits in CSV/Parquet/datasets to low; can be set to 'ignore' or 'keep').
+  const dataFilePolicy = ['demote', 'ignore', 'keep'].includes(config.secrets?.dataFiles)
+    ? config.secrets.dataFiles
+    : 'demote';
+  const {
+    findings: afterDemote,
+    demoted: dataFileDemotedCount,
+    ignored: dataFileIgnoredCount,
+  } = applyDataFileSecretPolicy(deduped, dataFilePolicy);
 
   // 5) optional minimum-confidence filter (reduce heuristic noise)
   let current = afterDemote;
@@ -319,6 +325,7 @@ export async function runScan(options = {}) {
     inlineSuppressedCount: inlineSuppressed.length,
     vendoredFilteredCount: vendoredFindings.length,
     dataFileDemotedCount,
+    dataFileIgnoredCount,
     duplicatesRemoved,
     minConfidence,
     minConfidenceFiltered,

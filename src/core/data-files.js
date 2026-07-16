@@ -38,25 +38,46 @@ export function isDataFile(file) {
   return DATA_FILE_EXTENSIONS.has(base.slice(dot));
 }
 
+/** Whether a finding is a low-certainty secret hit inside a data file. */
+function isLowCertaintyDataFileSecret(f) {
+  return (
+    f?.category === CATEGORY.secrets &&
+    f.severity !== SEVERITY.critical &&
+    f.confidence !== CONFIDENCE.high &&
+    isDataFile(f.file)
+  );
+}
+
 /**
- * Auto-demote likely-false-positive secret findings inside data files.
- * Returns the (new) findings array and how many were demoted.
+ * Apply the configured policy to likely-false-positive secret findings inside
+ * data files. High-confidence rule matches and verified/critical secrets are
+ * never affected — only low/medium-confidence entropy-style hits.
+ *
  * @param {object[]} findings
- * @returns {{findings: object[], demoted: number}}
+ * @param {'demote'|'ignore'|'keep'} [policy='demote']
+ * @returns {{findings: object[], demoted: number, ignored: number}}
+ *   - demote: drop to low severity/confidence but keep on record (default)
+ *   - ignore: remove entirely
+ *   - keep:   no change
  */
-export function demoteDataFileSecrets(findings) {
+export function applyDataFileSecretPolicy(findings, policy = 'demote') {
+  if (policy === 'keep') return { findings: findings || [], demoted: 0, ignored: 0 };
+
   let demoted = 0;
-  const out = (findings || []).map((f) => {
-    if (
-      f?.category === CATEGORY.secrets &&
-      f.severity !== SEVERITY.critical &&
-      f.confidence !== CONFIDENCE.high &&
-      isDataFile(f.file)
-    ) {
-      demoted += 1;
-      return { ...f, severity: SEVERITY.low, confidence: CONFIDENCE.low, demotedReason: 'data-file' };
+  let ignored = 0;
+  const out = [];
+  for (const f of findings || []) {
+    if (!isLowCertaintyDataFileSecret(f)) {
+      out.push(f);
+      continue;
     }
-    return f;
-  });
-  return { findings: out, demoted };
+    if (policy === 'ignore') {
+      ignored += 1;
+      continue; // drop entirely
+    }
+    // default: demote (keep on record, but low priority)
+    demoted += 1;
+    out.push({ ...f, severity: SEVERITY.low, confidence: CONFIDENCE.low, demotedReason: 'data-file' });
+  }
+  return { findings: out, demoted, ignored };
 }

@@ -146,6 +146,9 @@ export function render(scan, opts = {}) {
   if (scan.dataFileDemotedCount > 0) {
     out.push(chalk.gray(`  ${scan.dataFileDemotedCount} secret hit(s) in data files demoted to low (likely dataset noise)`));
   }
+  if (scan.dataFileIgnoredCount > 0) {
+    out.push(chalk.gray(`  ${scan.dataFileIgnoredCount} secret hit(s) in data files ignored (secrets.dataFiles=ignore)`));
+  }
   if (scan.minConfidenceFiltered > 0) {
     out.push(chalk.gray(`  ${scan.minConfidenceFiltered} below --min-confidence=${scan.minConfidence} hidden`));
   }

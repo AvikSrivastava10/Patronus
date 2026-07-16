@@ -249,6 +249,7 @@ Set `CI=1` or `CLIPEUS_NONINTERACTIVE=1` to guarantee Clipeus never prompts.
 
 - `tools.enabled` empty means **auto-detect**. Listing tools overrides detection.
 - `semgrep.registry` is the Semgrep registry ruleset run online (default `p/default`); set it to `false` to scan with only Clipeus's bundled rules, or set `semgrep.configs` to a list to choose the rule sources yourself. Clipeus never uses Semgrep's `auto` config, so scans stay telemetry-free (`--metrics=off`), and `--offline` drops the registry entirely.
+- `secrets.dataFiles` controls likely-false-positive secret hits inside data files (CSV/Parquet/ML datasets): `demote` (default — dropped to low severity but kept on record), `ignore` (dropped entirely), or `keep` (reported as-is). High-confidence rule matches and verified secrets are never affected, even in a data file.
 - The checker keyword lists are fully tunable to your project's naming conventions.
 
 ### `.clipeusignore`

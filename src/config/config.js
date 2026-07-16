@@ -85,6 +85,16 @@ export function getDefaultConfig() {
       ],
     },
 
+    // How to treat likely-false-positive secret hits inside data files
+    // (CSV/Parquet/ML datasets, …):
+    //   'demote' (default) — drop to low severity/confidence but keep on record,
+    //   'ignore'           — drop them entirely,
+    //   'keep'             — no special handling (report as the scanner rated them).
+    // High-confidence rule matches and verified secrets are never affected.
+    secrets: {
+      dataFiles: 'demote',
+    },
+
     // Additional suppression patterns merged with .clipeusignore entries.
     ignore: [],
   };
@@ -92,10 +102,11 @@ export function getDefaultConfig() {
 
 /** Known configuration keys, for typo detection (warnings only). */
 const KNOWN_KEYS = {
-  root: ['failOn', 'toolTimeoutMs', 'tools', 'checkers', 'taint', 'ignore', 'semgrep', 'gitleaks', 'trufflehog', 'trivy'],
+  root: ['failOn', 'toolTimeoutMs', 'tools', 'checkers', 'taint', 'ignore', 'secrets', 'semgrep', 'gitleaks', 'trufflehog', 'trivy'],
   tools: ['enabled', 'disabled'],
   checkers: ['sensitivePathKeywords', 'authMiddlewareNames', 'rateLimitMiddlewareNames', 'sensitiveRoutePatterns'],
   taint: ['sources', 'sinks', 'sanitizers'],
+  secrets: ['dataFiles'],
 };
 
 /** Warn (never throw) about unrecognized config keys to catch typos. */
@@ -112,6 +123,7 @@ function validateConfig(parsed, fileLabel) {
   warnUnknown(parsed.tools, KNOWN_KEYS.tools, 'tools.');
   warnUnknown(parsed.checkers, KNOWN_KEYS.checkers, 'checkers.');
   warnUnknown(parsed.taint, KNOWN_KEYS.taint, 'taint.');
+  warnUnknown(parsed.secrets, KNOWN_KEYS.secrets, 'secrets.');
 }
 
 function isPlainObject(v) {
